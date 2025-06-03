@@ -5,6 +5,21 @@
 
 set -e  # Exit on any error
 
+# Progress bar function
+show_progress() {
+    local total=$1
+    local current=$2
+    local width=50
+    local percentage=$((current * 100 / total))
+    local completed=$((width * current / total))
+    local remaining=$((width - completed))
+    
+    printf "\rProgress: ["
+    printf "%${completed}s" | tr " " "⬢"
+    printf "%${remaining}s" | tr " " "⬡"
+    printf "] %d%%" $percentage
+}
+
 echo "🍺 Installing Homebrew apps for your new Mac..."
 echo "======================================================"
 
@@ -47,7 +62,7 @@ APPS=(
     # Browsers
     "google-chrome"          # Google Chrome
     "firefox"                # Firefox
-    "zen-browser"          # Zen Browser (might not be available)
+    "zen-browser"            # Zen Browser (might not be available)
     
     # Other Tools
     "speedtest"              # Speedtest by Ookla
@@ -56,27 +71,34 @@ APPS=(
     # "workfolio"            # Workfolio (might not be available)
 )
 
-# Install each app
+# Install each app with progress bar
 echo "🚀 Installing applications..."
+total_apps=${#APPS[@]}
+current_app=0
+failed_apps=()
+
 for app in "${APPS[@]}"; do
+    ((current_app++))
     if [[ $app == \#* ]]; then
         continue  # Skip commented lines
     fi
     
-    echo "Installing $app..."
+    show_progress $total_apps $current_app
+    echo -e "\nInstalling $app..."
     if brew list --cask "$app" &>/dev/null; then
         echo "✅ $app is already installed"
     else
-        if brew install --cask "$app"; then
+        if brew install --cask "$app" 2>/dev/null; then
             echo "✅ Successfully installed $app"
         else
             echo "❌ Failed to install $app (might not be available via Homebrew)"
+            failed_apps+=("$app")
         fi
     fi
 done
 
-# Install command line tools via regular Homebrew
-echo "\n🔧 Installing command line tools..."
+# Install command line tools with progress bar
+echo -e "\n🔧 Installing command line tools..."
 CLI_TOOLS=(
     "git"
     "node"
@@ -85,26 +107,34 @@ CLI_TOOLS=(
     # Add other CLI tools you need
 )
 
+total_cli=${#CLI_TOOLS[@]}
+current_cli=0
+failed_cli=()
+
 for tool in "${CLI_TOOLS[@]}"; do
-    echo "Installing $tool..."
+    ((current_cli++))
+    show_progress $total_cli $current_cli
+    echo -e "\nInstalling $tool..."
     if brew list "$tool" &>/dev/null; then
         echo "✅ $tool is already installed"
     else
-        if brew install "$tool"; then
+        if brew install "$tool" 2>/dev/null; then
             echo "✅ Successfully installed $tool"
         else
             echo "❌ Failed to install $tool"
+            failed_cli+=("$tool")
         fi
     fi
 done
 
-echo "\n🎉 Installation complete!"
+echo -e "\n🎉 Installation complete!"
 echo "======================================================"
 echo "📝 Notes:"
 echo "• Some apps might not be available via Homebrew Cask"
 echo "• You can manually install missing apps from their websites"
 echo "• Run 'brew cleanup' to remove old versions"
-echo "\n🔍 Apps that might need manual installation:"
+
+echo -e "\n🔍 Apps that need manual installation:"
 echo "• Zen Browser"
 echo "• GitButler"
 echo "• Windows Snap"
@@ -114,4 +144,15 @@ echo "• Terminology"
 echo "• SQLPro for MSSQL"
 echo "• Ollama (can be installed via: brew install ollama)"
 
-echo "\n✨ Your new Mac is ready to go!"
+# Show failed installations if any
+if [ ${#failed_apps[@]} -ne 0 ]; then
+    echo -e "\n⚠️ Failed app installations:"
+    printf '• %s\n' "${failed_apps[@]}"
+fi
+
+if [ ${#failed_cli[@]} -ne 0 ]; then
+    echo -e "\n⚠️ Failed CLI tool installations:"
+    printf '• %s\n' "${failed_cli[@]}"
+fi
+
+echo -e "\n✨ Your new Mac is ready to go!"
